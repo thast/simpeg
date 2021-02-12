@@ -32,6 +32,8 @@ from ..utils import (
     GaussianMixtureWithPrior,
     GaussianMixtureWithNonlinearRelationships,
     GaussianMixtureWithNonlinearRelationshipsWithPrior,
+    GaussianMixtureMarkovRandomField,
+    GaussianMixtureMarkovRandomFieldWithPrior,
     Zero,
 )
 from ..directives import InversionDirective, MultiTargetMisfits
@@ -111,6 +113,38 @@ class PGI_UpdateParameters(InversionDirective):
                     verbose_interval=self.pgi_reg.gmm.verbose_interval,
                     warm_start=self.pgi_reg.gmm.warm_start,
                     fixed_membership=self.fixed_membership,
+                )
+                clfupdate = clfupdate.fit(model)
+
+            elif self.update_gmm and isinstance(
+                self.pgi_reg.gmmref, GaussianMixtureMarkovRandomField
+            ):
+                print('update GMMRF')
+                clfupdate = GaussianMixtureMarkovRandomFieldWithPrior(
+                    gmmref=self.pgi_reg.gmmref,
+                    #mesh=self.pgi_reg.gmmref.mesh,
+                    #_components=self.pgi_reg.gmmref.n_components,
+                    #kneighbors=self.pgi_reg.gmmref.kneighbors,
+                    #indexneighbors =self.pgi_reg.gmmref.indexneighbors,
+                    #kdtree = self.pgi_reg.gmmref.kdtree,
+                    #T=self.pgi_reg.gmmref.T,
+                    zeta=self.zeta,
+                    kappa=self.kappa,
+                    nu=self.nu,
+                    verbose=self.verbose,
+                    prior_type="semi",
+                    update_covariances=self.update_covariances,
+                    max_iter=self.pgi_reg.gmm.max_iter,
+                    n_init=self.pgi_reg.gmm.n_init,
+                    reg_covar=self.pgi_reg.gmm.reg_covar,
+                    weights_init=self.pgi_reg.gmm.weights_,
+                    means_init=self.pgi_reg.gmm.means_,
+                    precisions_init=self.pgi_reg.gmm.precisions_,
+                    random_state=self.pgi_reg.gmm.random_state,
+                    tol=self.pgi_reg.gmm.tol,
+                    verbose_interval=self.pgi_reg.gmm.verbose_interval,
+                    warm_start=self.pgi_reg.gmm.warm_start,
+                    #fixed_membership=self.fixed_membership,
                 )
                 clfupdate = clfupdate.fit(model)
 

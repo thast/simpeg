@@ -67,6 +67,13 @@ from .pgi_utils import (
     GaussianMixtureWithNonlinearRelationshipsWithPrior,
 )
 
+from .pgi_gmmrf_utils import (
+    ICM_PottsDenoising,
+    GibbsSampling_PottsDenoising,
+    GaussianMixtureMarkovRandomField,
+    GaussianMixtureMarkovRandomFieldWithPrior,
+)
+
 """
 Deprecated,
 don't think we can throw warning if a user accesses them from here...

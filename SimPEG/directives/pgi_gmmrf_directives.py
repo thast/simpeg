@@ -27,11 +27,13 @@ from ..utils import (
     GaussianMixtureWithNonlinearRelationships,
     GaussianMixtureWithNonlinearRelationshipsWithPrior,
     Zero,
+    ICM_PottsDenoising,
+    GibbsSampling_PottsDenoising
 )
 from ..directives import InversionDirective, MultiTargetMisfits
 from ..utils.code_utils import deprecate_property
 
-class SmoothUpdateReferenceModel(InversionDirective):
+class PGI_GMMRF_IsingModel(InversionDirective):
 
     neighbors = None
     distance = 2
@@ -54,24 +56,24 @@ class SmoothUpdateReferenceModel(InversionDirective):
         modellist = self.invProb.reg.wiresmap * m
         model = np.c_[
             [a * b for a, b in zip(self.invProb.reg.maplist, modellist)]].T
-        minit = self.invProb.reg.GMmodel.predict(model)
+        minit = self.invProb.reg.gmm.predict(model)
 
-        indActive = self.invProb.reg.indActive
+        indActive = self.invProb.reg.regmesh.indActive
 
         if self.Pottmatrix is None:
-            n_unit = self.invProb.reg.GMmodel.n_components
+            n_unit = self.invProb.reg.gmm.n_components
             Pott = np.ones([n_unit, n_unit]) * self.offdiag
             for i in range(Pott.shape[0]):
                 Pott[i, i] = self.indiag
             self.Pottmatrix = Pott
 
         # if self.log_univar is None:
-        _, self.log_univar = self.invProb.reg.GMmodel._estimate_log_prob_resp(
+        _, self.log_univar = self.invProb.reg.gmm._estimate_log_prob_resp(
             model
         )
 
         if self.method == 'Gibbs':
-            denoised = Utils.GibbsSampling_PottsDenoising(
+            denoised = GibbsSampling_PottsDenoising(
                 mesh, minit,
                 self.log_univar,
                 self.Pottmatrix,
@@ -84,7 +86,7 @@ class SmoothUpdateReferenceModel(InversionDirective):
                 verbose=self.verbose
             )
         elif self.method == 'ICM':
-            denoised = Utils.ICM_PottsDenoising(
+            denoised = ICM_PottsDenoising(
                 mesh, minit,
                 self.log_univar,
                 self.Pottmatrix,
@@ -97,5 +99,5 @@ class SmoothUpdateReferenceModel(InversionDirective):
                 verbose=self.verbose
             )
 
-        self.invProb.reg.mref = Utils.mkvc(
-            self.invProb.reg.GMmodel.means_[denoised[0]])
+        self.invProb.reg.mref = mkvc(
+            self.invProb.reg.gmm.means_[denoised[0]])
