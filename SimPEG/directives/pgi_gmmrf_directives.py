@@ -46,6 +46,7 @@ class PGI_GMMRF_IsingModel(InversionDirective):
     indiag = 1.
     Pottmatrix = None
     log_univar = None
+    anisotropies = None
 
     def endIter(self):
         mesh = self.invProb.reg._mesh
@@ -83,7 +84,8 @@ class PGI_GMMRF_IsingModel(InversionDirective):
                 weighted_selection=self.weigthed_random_walk,
                 compute_score=self.compute_score,
                 maxit=self.maxit,
-                verbose=self.verbose
+                verbose=self.verbose,
+                anisotropies=self.anisotropies
             )
         elif self.method == 'ICM':
             denoised = ICM_PottsDenoising(
@@ -96,7 +98,8 @@ class PGI_GMMRF_IsingModel(InversionDirective):
                 weighted_selection=self.weigthed_random_walk,
                 compute_score=self.compute_score,
                 maxit=self.maxit,
-                verbose=self.verbose
+                verbose=self.verbose,
+                anisotropies=self.anisotropies
             )
 
         self.invProb.reg.mref = mkvc(

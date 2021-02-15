@@ -46,6 +46,7 @@ class GaussianMixtureMarkovRandomField(WeightedGaussianMixture):
         boreholeidx=None,
         T=12., kneighbors=0,
         init_params='kmeans', max_iter=100,
+        covariance_type='full',
         means_init=None, n_init=10, precisions_init=None,
         random_state=None, reg_covar=1e-06, tol=0.001, verbose=0,
         verbose_interval=10, warm_start=False, weights_init=None,
@@ -61,6 +62,7 @@ class GaussianMixtureMarkovRandomField(WeightedGaussianMixture):
             n_components=n_components,
             mesh=mesh,
             actv=actv,
+            covariance_type=covariance_type,
             init_params=init_params,
             max_iter=max_iter,
             means_init=means_init,
@@ -118,18 +120,28 @@ class GaussianMixtureMarkovRandomField(WeightedGaussianMixture):
                 for i, anis in enumerate(self.index_anisotropy['anisotropy']):
                     self.index_kdtree.append(spatial.KDTree(self.unitxyz[i]))
 
-            print('Computing new neighbors based on rock units, it may take several minutes.')
-            for i, unitindex in enumerate(self.index_anisotropy['index']):
+            #print('Computing new neighbors based on rock units, it may take several minutes.')
+            #for i, unitindex in enumerate(self.index_anisotropy['index']):
+        #        _, self.indexpoint[unitindex] = self.index_kdtree[i].query(self.unitxyz[i][unitindex], k=self.kneighbors+1)
+
+
+    def computeG(self, z, w, X):
+
+        #Find neighbors given the current state of data and model
+        if self.index_anisotropy is not None and self.mesh.gridCC.ndim != 1:
+            prediction = self.predict(X)
+            unit_index = []
+            for i in range(self.n_components):
+                unit_index.append(np.where(prediction==i)[0])
+            for i, unitindex in enumerate(unit_index):
                 _, self.indexpoint[unitindex] = self.index_kdtree[i].query(self.unitxyz[i][unitindex], k=self.kneighbors+1)
 
-
-    def computeG(self, z, w):
-            logG = (self.T/(2.*(self.kneighbors+1))) * (
-                (z[self.indexpoint] + w[self.indexpoint]).sum(
-                    axis=1
-                )
+        logG = (self.T/(2.*(self.kneighbors+1))) * (
+            (z[self.indexpoint] + w[self.indexpoint]).sum(
+                axis=1
             )
-            return logG
+        )
+        return logG
 
     def _m_step(self, X, log_resp):
         """M step.
@@ -148,7 +160,7 @@ class GaussianMixtureMarkovRandomField(WeightedGaussianMixture):
         self.precisions_cholesky_ = _compute_precision_cholesky(
             self.covariances_, self.covariance_type)
 
-        logweights = logsumexp(np.c_[[log_resp, self.computeG(np.exp(log_resp), self.weights_)]], axis=0)
+        logweights = logsumexp(np.c_[[log_resp, self.computeG(np.exp(log_resp), self.weights_,X)]], axis=0)
         logweights = logweights - logsumexp(
             logweights, axis=1, keepdims=True
         )
@@ -329,18 +341,28 @@ class GaussianMixtureMarkovRandomFieldWithPrior(GaussianMixtureWithPrior):
                 for i, anis in enumerate(self.index_anisotropy['anisotropy']):
                     self.index_kdtree.append(spatial.KDTree(self.unitxyz[i]))
 
-            print('Computing new neighbors based on rock units, it may take several minutes.')
-            for i, unitindex in enumerate(self.index_anisotropy['index']):
+            #print('Computing new neighbors based on rock units, it may take several minutes.')
+            #for i, unitindex in enumerate(self.index_anisotropy['index']):
+        #        _, self.indexpoint[unitindex] = self.index_kdtree[i].query(self.unitxyz[i][unitindex], k=self.kneighbors+1)
+
+
+    def computeG(self, z, w, X):
+
+        #Find neighbors given the current state of data and model
+        if self.index_anisotropy is not None and self.mesh.gridCC.ndim != 1:
+            prediction = self.predict(X)
+            unit_index = []
+            for i in range(self.n_components):
+                unit_index.append(np.where(prediction==i)[0])
+            for i, unitindex in enumerate(unit_index):
                 _, self.indexpoint[unitindex] = self.index_kdtree[i].query(self.unitxyz[i][unitindex], k=self.kneighbors+1)
 
-
-    def computeG(self, z, w):
-            logG = (self.T/(2.*(self.kneighbors+1))) * (
-                (z[self.indexpoint] + w[self.indexpoint]).sum(
-                    axis=1
-                )
+        logG = (self.T/(2.*(self.kneighbors+1))) * (
+            (z[self.indexpoint] + w[self.indexpoint]).sum(
+                axis=1
             )
-            return logG
+        )
+        return logG
 
     def _m_step(self, X, log_resp):
         """M step.
@@ -359,7 +381,7 @@ class GaussianMixtureMarkovRandomFieldWithPrior(GaussianMixtureWithPrior):
         self.precisions_cholesky_ = _compute_precision_cholesky(
             self.covariances_, self.covariance_type)
 
-        logweights = logsumexp(np.c_[[log_resp, self.computeG(np.exp(log_resp), self.weights_)]], axis=0)
+        logweights = logsumexp(np.c_[[log_resp, self.computeG(np.exp(log_resp), self.weights_, X)]], axis=0)
         logweights = logweights - logsumexp(
             logweights, axis=1, keepdims=True
         )
@@ -454,7 +476,8 @@ def GibbsSampling_PottsDenoising(mesh, minit, log_univar, Pottmatrix,
                                  weighted_selection=True,
                                  compute_score=False,
                                  maxit=None,
-                                 verbose=False):
+                                 verbose=False,
+                                 anisotropies=None):
 
     denoised = copy.deepcopy(minit)
     # Compute Tree for neighbors finding
@@ -466,6 +489,13 @@ def GibbsSampling_PottsDenoising(mesh, minit, log_univar, Pottmatrix,
         pass
     else:
         GRIDCC = GRIDCC[indActive]
+
+        if self.index_kdtree is None:
+            self.index_kdtree = []
+            print('Computing rock unit specific KDTree, it may take several minutes.')
+            for i, anis in enumerate(self.index_anisotropy['anisotropy']):
+                self.index_kdtree.append(spatial.KDTree(self.unitxyz[i]))
+
     tree = spatial.KDTree(GRIDCC)
     n_components = log_univar.shape[1]
 
@@ -548,7 +578,8 @@ def ICM_PottsDenoising(mesh, minit, log_univar, Pottmatrix,
                        weighted_selection=True,
                        compute_score=False,
                        maxit=None,
-                       verbose=True):
+                       verbose=True,
+                       anisotropies=None):
 
     denoised = copy.deepcopy(minit)
     # Compute Tree for neighbors finding
@@ -560,12 +591,61 @@ def ICM_PottsDenoising(mesh, minit, log_univar, Pottmatrix,
         pass
     else:
         GRIDCC = GRIDCC[indActive]
+
+#if self.index_anisotropy is not None and self.mesh.gridCC.ndim != 1:
+
+#    self.unitxyz = []
+#    for i, anis in enumerate(self.index_anisotropy['anisotropy']):
+#        self.unitxyz.append((anis).dot(self.xyz.T).T)
+
+#    if self.index_kdtree is None:
+#        self.index_kdtree = []
+#        print('Computing rock unit specific KDTree, it may take several minutes.')
+#        for i, anis in enumerate(self.index_anisotropy['anisotropy']):
+#            self.index_kdtree.append(spatial.KDTree(self.unitxyz[i]))
+
+
+    #print('Computing new neighbors based on rock units, it may take several minutes.')
+    #for i, unitindex in enumerate(self.index_anisotropy['index']):
+#        _, self.indexpoint[unitindex] = self.index_kdtree[i].query(self.unitxyz[i][unitindex], k=self.kneighbors+1)
+
+#Find neighbors given the current state of data and model
+#if self.index_anisotropy is not None and self.mesh.gridCC.ndim != 1:
+#    prediction = self.predict(X)
+#    unit_index = []
+#    for i in range(self.n_components):
+#        unit_index.append(np.where(prediction==i)[0])
+#    for i, unitindex in enumerate(unit_index):
+#        _, self.indexpoint[unitindex] = self.index_kdtree[i].query(self.unitxyz[i][unitindex], k=self.kneighbors+1)
+
+    #compute all tree
+    #
     tree = spatial.KDTree(GRIDCC)
     n_components = log_univar.shape[1]
+    if anisotropies is not None:
+        treelist = []
+        ani_xyzlist = []
+        for anis in anisotropies['anisotropy']:
+            ani_xyzlist.append(anis.dot(GRIDCC.T).T)
+            treelist.append(spatial.KDTree(ani_xyzlist[-1]))
 
     if weighted_selection or compute_score:
         _, idx = tree.query(GRIDCC, k=neighbors + 1, p=norm)
         idx = idx[:, 1:]
+
+        if anisotropies is not None:
+            idxlist=[]
+            for anitree, xyz in zip(treelist,ani_xyzlist):
+                _, idx_ani = anitree.query(xyz, k=neighbors + 1, p=norm)
+                idx_ani = idx_ani[:, 1:]
+                idxlist.append(idx_ani)
+
+            n_units = Pottmatrix.shape[0]
+            unit_index = []
+            for i in range(n_units):
+                unit_index.append(np.where(denoised==i)[0])
+            for i, unitindex in enumerate(unit_index):
+                idx[unitindex] = idxlist[i][unitindex]
 
     if weighted_selection:
         logprobnoise = -np.sum(np.r_[[Pottmatrix[minit[j], minit[idx[j]]]
@@ -611,6 +691,9 @@ def ICM_PottsDenoising(mesh, minit, log_univar, Pottmatrix,
         postprobj = np.exp(postlogprob - logsumexp(postlogprob))
 
         denoised[j] = np.argmax(postprobj)
+        #update kneighbors is anisotropy specific to unit
+        if anisotropies is not None:
+            idx[j] = idxlist[denoised[j]][j]
 
         if compute_score:
             # Compute logprobability of the model, should increase
