@@ -44,7 +44,9 @@ class GaussianMixtureMarkovRandomField(WeightedGaussianMixture):
         actv=None,
         kdtree=None, indexneighbors=None,
         boreholeidx=None,
-        T=12., kneighbors=0,
+        T=12.,
+        kneighbors=0,
+        norm_neighbors=2,
         init_params='kmeans', max_iter=100,
         covariance_type='full',
         means_init=None, n_init=10, precisions_init=None,
@@ -101,7 +103,7 @@ class GaussianMixtureMarkovRandomField(WeightedGaussianMixture):
             self.kdtree = kdtree
         if indexneighbors is None:
             print('Computing neighbors, it may take several minutes.')
-            _, self.indexneighbors = self.kdtree.query(self.xyz, k=self.kneighbors+1)
+            _, self.indexneighbors = self.kdtree.query(self.xyz, k=self.kneighbors+1, p=norm_neighbors)
         else:
             self.indexneighbors = indexneighbors
 
@@ -130,17 +132,26 @@ class GaussianMixtureMarkovRandomField(WeightedGaussianMixture):
         #Find neighbors given the current state of data and model
         if self.index_anisotropy is not None and self.mesh.gridCC.ndim != 1:
             prediction = self.predict(X)
-            unit_index = []
+            self.unit_index = []
+            self.indexpointlist = []
+            logG = np.zeros([self.xyz.shape[0],self.n_components])
             for i in range(self.n_components):
-                unit_index.append(np.where(prediction==i)[0])
-            for i, unitindex in enumerate(unit_index):
-                _, self.indexpoint[unitindex] = self.index_kdtree[i].query(self.unitxyz[i][unitindex], k=self.kneighbors+1)
+                unitindex = np.where(prediction==i)[0]
+                self.unit_index.append(unitindex)
+                _, idxpt = self.index_kdtree[i].query(
+                    self.unitxyz[i][unitindex],
+                    k=self.index_anisotropy['kneighbors'][i]+1,
+                    p=self.index_anisotropy['norm'][i]
+                )
+                self.indexpointlist.append(idxpt)
+                logG[unitindex] = (self.T/(2.*(self.index_anisotropy['kneighbors'][i]+1))) * (
+                    (z[idxpt] + w[idxpt]).sum(axis=1)
+                )
 
-        logG = (self.T/(2.*(self.kneighbors+1))) * (
-            (z[self.indexpoint] + w[self.indexpoint]).sum(
-                axis=1
+        else:
+            logG = (self.T/(2.*(self.kneighbors+1))) * (
+                (z[self.indexpoint] + w[self.indexpoint]).sum(axis=1)
             )
-        )
         return logG
 
     def _m_step(self, X, log_resp):
@@ -351,17 +362,26 @@ class GaussianMixtureMarkovRandomFieldWithPrior(GaussianMixtureWithPrior):
         #Find neighbors given the current state of data and model
         if self.index_anisotropy is not None and self.mesh.gridCC.ndim != 1:
             prediction = self.predict(X)
-            unit_index = []
+            self.unit_index = []
+            self.indexpointlist = []
+            logG = np.zeros([self.xyz.shape[0],self.n_components])
             for i in range(self.n_components):
-                unit_index.append(np.where(prediction==i)[0])
-            for i, unitindex in enumerate(unit_index):
-                _, self.indexpoint[unitindex] = self.index_kdtree[i].query(self.unitxyz[i][unitindex], k=self.kneighbors+1)
+                unitindex = np.where(prediction==i)[0]
+                self.unit_index.append(unitindex)
+                _, idxpt = self.index_kdtree[i].query(
+                    self.unitxyz[i][unitindex],
+                    k=self.index_anisotropy['kneighbors'][i]+1,
+                    p=self.index_anisotropy['norm'][i]
+                )
+                self.indexpointlist.append(idxpt)
+                logG[unitindex] = (self.T/(2.*(self.index_anisotropy['kneighbors'][i]+1))) * (
+                    (z[idxpt] + w[idxpt]).sum(axis=1)
+                )
 
-        logG = (self.T/(2.*(self.kneighbors+1))) * (
-            (z[self.indexpoint] + w[self.indexpoint]).sum(
-                axis=1
+        else:
+            logG = (self.T/(2.*(self.kneighbors+1))) * (
+                (z[self.indexpoint] + w[self.indexpoint]).sum(axis=1)
             )
-        )
         return logG
 
     def _m_step(self, X, log_resp):
@@ -536,7 +556,7 @@ def GibbsSampling_PottsDenoising(mesh, minit, log_univar, Pottmatrix,
         else:
             j = np.random.randint(mesh.nC)
             if not weighted_selection or compute_score:
-                _, idxj = tree.query(mesh.gridCC[j], k=neighbors, p=norm)
+                _, idxj = tree.query(mesh.gridCC[j], k=neighbors+1, p=norm)
 
         # compute Probability
         postlogprob = np.zeros_like(log_univar[j])
@@ -681,7 +701,7 @@ def ICM_PottsDenoising(mesh, minit, log_univar, Pottmatrix,
         else:
             j = np.random.randint(mesh.nC)
             if not weighted_selection or compute_score:
-                _, idxj = tree.query(mesh.gridCC[j], k=neighbors, p=norm)
+                _, idxj = tree.query(mesh.gridCC[j], k=neighbors+1, p=norm)
 
         # compute Probability
         postlogprob = np.zeros(n_components)
@@ -709,13 +729,13 @@ def ICM_PottsDenoising(mesh, minit, log_univar, Pottmatrix,
             probnoise = probnoise/np.sum(probnoise)
 
     if compute_score and weighted_selection:
-        return [denoised, probnoise, logprob_obj]
+        return [denoised, idx, probnoise, logprob_obj]
 
     elif not(compute_score or weighted_selection):
-        return [denoised]
+        return [denoised, idx]
 
     elif compute_score:
-        return [denoised, logprob_obj]
+        return [denoised, idx, logprob_obj]
 
     elif weighted_selection:
-        return [denoised, probnoise]
+        return [denoised, idx, probnoise]
