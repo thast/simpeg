@@ -655,21 +655,29 @@ def ICM_PottsDenoising(mesh, minit, log_univar, Pottmatrix,
 
         if anisotropies is not None:
             idxlist=[]
-            for anitree, xyz in zip(treelist,ani_xyzlist):
-                _, idx_ani = anitree.query(xyz, k=neighbors + 1, p=norm)
+            for i, (anitree, xyz) in enumerate(zip(treelist,ani_xyzlist)):
+                _, idx_ani = anitree.query(xyz, k=anisotropies['kneighbors'][i] + 1, p=anisotropies['norm'][i])
                 idx_ani = idx_ani[:, 1:]
                 idxlist.append(idx_ani)
 
             n_units = Pottmatrix.shape[0]
             unit_index = []
+
             for i in range(n_units):
                 unit_index.append(np.where(denoised==i)[0])
-            for i, unitindex in enumerate(unit_index):
-                idx[unitindex] = idxlist[i][unitindex]
+            #form the initial list of neighbors for checking
+            idx = []
+            for i in range(GRIDCC.shape[0]):
+                idx.append(idxlist[denoised[i]][i])
+            #for i, unitindex in enumerate(unit_index):
+            #    idx[unitindex] = idxlist[i][unitindex]
 
     if weighted_selection:
-        logprobnoise = -np.sum(np.r_[[Pottmatrix[minit[j], minit[idx[j]]]
-                                      for j in range(len(minit))]], axis=1)
+        logprobnoise = np.zeros(GRIDCC.shape[0])
+        for i, unitindex in enumerate(unit_index):
+            if unitindex.size>0:
+                logprobnoise[unitindex] = -np.sum(np.r_[[Pottmatrix[denoised[unitindex][j], denoised[idxlist[i][unitindex][j]]]
+                                      for j in range(len(denoised[unitindex]))]], axis=1)
         idxmin = np.where(logprobnoise == logprobnoise.min())
         #logprobnoise[idxmin] = -np.inf
         probnoise = np.exp(logprobnoise - logsumexp(logprobnoise))
@@ -697,7 +705,7 @@ def ICM_PottsDenoising(mesh, minit, log_univar, Pottmatrix,
         # select random point and neighbors
         if weighted_selection:
             j = np.random.choice(choice, p=probnoise)
-            idxj = idx[j]
+            #idxj = idx[j]
         else:
             j = np.random.randint(mesh.nC)
             if not weighted_selection or compute_score:
@@ -707,7 +715,7 @@ def ICM_PottsDenoising(mesh, minit, log_univar, Pottmatrix,
         postlogprob = np.zeros(n_components)
         for k in range(n_components):
             postlogprob[k] = log_univar[j][k] + \
-                np.sum([Pottmatrix[k, denoised[idc]] for idc in idxj])
+                np.sum([Pottmatrix[k, denoised[idc]] for idc in idxlist[k][j]])
         postprobj = np.exp(postlogprob - logsumexp(postlogprob))
 
         denoised[j] = np.argmax(postprobj)
@@ -724,7 +732,7 @@ def ICM_PottsDenoising(mesh, minit, log_univar, Pottmatrix,
         if weighted_selection:
             # Update the probability of being noisy
             logprobnoise[j] = - \
-                np.sum(np.r_[Pottmatrix[denoised[j], denoised[idx[j]]]])
+                np.sum(np.r_[Pottmatrix[denoised[j], denoised[idxlist[denoised[j]][j]]]])
             probnoise = np.exp(logprobnoise - logsumexp(logprobnoise))
             probnoise = probnoise/np.sum(probnoise)
 
