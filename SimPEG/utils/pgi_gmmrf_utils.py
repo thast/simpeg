@@ -673,11 +673,15 @@ def ICM_PottsDenoising(mesh, minit, log_univar, Pottmatrix,
             #    idx[unitindex] = idxlist[i][unitindex]
 
     if weighted_selection:
-        logprobnoise = np.zeros(GRIDCC.shape[0])
-        for i, unitindex in enumerate(unit_index):
-            if unitindex.size>0:
-                logprobnoise[unitindex] = -np.sum(np.r_[[Pottmatrix[denoised[unitindex][j], denoised[idxlist[i][unitindex][j]]]
+        if anisotropies is not None:
+            logprobnoise = np.zeros(GRIDCC.shape[0])
+            for i, unitindex in enumerate(unit_index):
+                if unitindex.size>0:
+                    logprobnoise[unitindex] = -np.sum(np.r_[[Pottmatrix[denoised[unitindex][j], denoised[idxlist[i][unitindex][j]]]
                                       for j in range(len(denoised[unitindex]))]], axis=1)
+        else:
+            logprobnoise = -np.sum(np.r_[[Pottmatrix[denoised[j], denoised[idx[j]]]
+                              for j in range(len(denoised))]], axis=1)
         idxmin = np.where(logprobnoise == logprobnoise.min())
         #logprobnoise[idxmin] = -np.inf
         probnoise = np.exp(logprobnoise - logsumexp(logprobnoise))
@@ -714,8 +718,12 @@ def ICM_PottsDenoising(mesh, minit, log_univar, Pottmatrix,
         # compute Probability
         postlogprob = np.zeros(n_components)
         for k in range(n_components):
-            postlogprob[k] = log_univar[j][k] + \
-                np.sum([Pottmatrix[k, denoised[idc]] for idc in idxlist[k][j]])
+            if anisotropies is not None:
+                postlogprob[k] = log_univar[j][k] + \
+                    np.sum([Pottmatrix[k, denoised[idc]] for idc in idxlist[k][j]])
+            else:
+                postlogprob[k] = log_univar[j][k] + \
+                    np.sum([Pottmatrix[k, denoised[idc]] for idc in idx[j]])
         postprobj = np.exp(postlogprob - logsumexp(postlogprob))
 
         denoised[j] = np.argmax(postprobj)
@@ -731,8 +739,12 @@ def ICM_PottsDenoising(mesh, minit, log_univar, Pottmatrix,
 
         if weighted_selection:
             # Update the probability of being noisy
-            logprobnoise[j] = - \
-                np.sum(np.r_[Pottmatrix[denoised[j], denoised[idxlist[denoised[j]][j]]]])
+            if anisotropies is not None:
+                logprobnoise[j] = - \
+                    np.sum(np.r_[Pottmatrix[denoised[j], denoised[idxlist[denoised[j]][j]]]])
+            else:
+                logprobnoise[j] = - \
+                    np.sum(np.r_[Pottmatrix[denoised[j], denoised[idx[j]]]])
             probnoise = np.exp(logprobnoise - logsumexp(logprobnoise))
             probnoise = probnoise/np.sum(probnoise)
 
