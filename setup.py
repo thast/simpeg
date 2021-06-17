@@ -31,7 +31,7 @@ with open("README.rst") as f:
 
 setup(
     name="SimPEG",
-    version="0.14.3",
+    version="0.15.0",
     packages=find_packages(exclude=["tests*", "examples*", "tutorials*"]),
     install_requires=[
         "numpy>=1.7",
@@ -41,7 +41,7 @@ setup(
         "matplotlib",
         "properties>=0.5.2",
         "vectormath>=0.2.0",
-        "discretize>=0.4.0",
+        "discretize>=0.7.0",
         "geoana>=0.0.4",
         "empymod",
         "pandas",
