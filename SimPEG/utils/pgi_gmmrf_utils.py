@@ -44,7 +44,7 @@ class GaussianMixtureMarkovRandomField(WeightedGaussianMixture):
         actv=None,
         kdtree=None, indexneighbors=None,
         boreholeidx=None,
-        T=12., kneighbors=0,
+        T=12., kneighbors=0, norm=2,
         init_params='kmeans', max_iter=100,
         covariance_type='full',
         means_init=None, n_init=10, precisions_init=None,
@@ -83,6 +83,7 @@ class GaussianMixtureMarkovRandomField(WeightedGaussianMixture):
         self.T = T
         self.boreholeidx = boreholeidx
         self.anisotropy = anisotropy
+        self.norm = norm
 
         if self.mesh.gridCC.ndim == 1:
             xyz = np.c_[self.mesh.gridCC]
@@ -101,7 +102,7 @@ class GaussianMixtureMarkovRandomField(WeightedGaussianMixture):
             self.kdtree = kdtree
         if indexneighbors is None:
             print('Computing neighbors, it may take several minutes.')
-            _, self.indexneighbors = self.kdtree.query(self.xyz, k=self.kneighbors+1)
+            _, self.indexneighbors = self.kdtree.query(self.xyz, k=self.kneighbors+1, p=self.norm)
         else:
             self.indexneighbors = indexneighbors
 
@@ -266,7 +267,7 @@ class GaussianMixtureMarkovRandomFieldWithPrior(GaussianMixtureWithPrior):
         random_state=None, reg_covar=1e-06, tol=0.001, verbose=0,
         verbose_interval=10, warm_start=False, weights_init=None,
         #kdtree=None, indexneighbors=None,
-        #T=12., kneighbors=0,
+        #T=12., kneighbors=0, norm=2,
         #anisotropy=None,
         #unit_anisotropy=None, # Dictionary with unit, anisotropy and index
         #unit_kdtree=None, # List of KDtree
