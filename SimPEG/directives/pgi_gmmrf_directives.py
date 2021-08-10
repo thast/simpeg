@@ -47,7 +47,7 @@ class PGI_GMMRF_IsingModel(InversionDirective):
     Pottmatrix = None
     log_univar = None
     anisotropies = None
-    max_probanoise = 1.
+    max_probanoise = None
     maxit_factor = 1.
 
     def initialize(self):

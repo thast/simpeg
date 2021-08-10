@@ -587,6 +587,8 @@ def ICM_PottsDenoising(mesh, minit, log_univar, Pottmatrix,
                        weighted_selection=True,
                        compute_score=False,
                        maxit=None,
+                       maxit_factor=1.,
+                       max_probanoise=None,
                        verbose=True,
                        anisotropies=None):
 
@@ -663,10 +665,14 @@ def ICM_PottsDenoising(mesh, minit, log_univar, Pottmatrix,
         #logprobnoise[idxmin] = -np.inf
         probnoise = np.exp(logprobnoise - logsumexp(logprobnoise))
         probnoise = probnoise/np.sum(probnoise)
+        if max_probanoise is not None:
+            if any(probnoise>max_probanoise):
+                probnoise = np.minimum(probnoise,max_probanoise)
+                probnoise = probnoise/np.sum(probnoise)
         choice = np.arange(len(minit))
         if maxit is None:
             maxit = int(
-                (1 + len(GRIDCC) - len(idxmin[0])) * np.log(1 + len(GRIDCC) - len(idxmin[0])))
+                maxit_factor * (1 + len(GRIDCC) - len(idxmin[0])) * np.log(1 + len(GRIDCC) - len(idxmin[0])))
             if verbose:
                 print('max iterations: ', maxit)
 
@@ -716,6 +722,10 @@ def ICM_PottsDenoising(mesh, minit, log_univar, Pottmatrix,
                 np.sum(np.r_[Pottmatrix[denoised[j], denoised[idx[j]]]])
             probnoise = np.exp(logprobnoise - logsumexp(logprobnoise))
             probnoise = probnoise/np.sum(probnoise)
+            if max_probanoise is not None:
+                if any(probnoise>max_probanoise):
+                    probnoise = np.minimum(probnoise,max_probanoise)
+                    probnoise = probnoise/np.sum(probnoise)
 
     if compute_score and weighted_selection:
         return [denoised, idx, probnoise, logprob_obj]
