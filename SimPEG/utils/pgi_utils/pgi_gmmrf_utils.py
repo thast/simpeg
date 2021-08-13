@@ -28,12 +28,272 @@ from ..regularization import (
     Simple,
     PGI,
     Tikhonov,
-    SimplePGIwithRelationships,
 )
-from .pgi_utils import (
+from .pgi_gmm_utils import (
     WeightedGaussianMixture,
     GaussianMixtureWithPrior,
 )
+
+def make_SimplePGI_GMMRF_continuity_regularization(
+    mesh,
+    gmmref,
+    gmm=None,
+    wiresmap=None,
+    maplist=None,
+    cell_weights_list=None,
+    approx_hessian=True,
+    approx_gradient=True,
+    approx_eval=True,
+    alpha_s=1.0,
+    alpha_x=1.0,
+    alpha_y=1.0,
+    alpha_z=1.0,
+    alpha_xx=0.0,
+    alpha_yy=0.0,
+    alpha_zz=0.0,
+    **kwargs
+):
+    """
+    Create a complete SimplePGI regularization term ComboObjectiveFunction with all
+    necessary smallness and smoothness terms for any number of physical properties
+    and associated mapping.
+
+    Parameters
+    ----------
+
+    :param TensorMesh or TreeMesh mesh: TensorMesh or Treemesh object, used to weights
+                        the physical properties by cell volumes when updating the
+                        Gaussian Mixture Model (GMM)
+    :param WeightedGaussianMixture gmmref: reference GMM.
+    :param WeightedGaussianMixture gmm: Initial GMM. If not provided, gmmref is used.
+    :param Wires wiresmap: Wires map to obtain the various physical properties from the model.
+                        Optional for single physical property inversion. Required for multi-
+                        physical properties inversion.
+    :param list maplist: List of mapping for each physical property. Default is the IdentityMap for all.
+    :param list cell_weights_list: list of numpy.ndarray for the cells weight to apply to each physical property.
+    :param boolean approx_gradient: use the PGI least-squares approximation of the full nonlinear regularizer
+                        for computing the regularizer gradient. Default is True.
+    :param boolean approx_eval: use the PGI least-squares approximation of the full nonlinear regularizer
+                        for computing the value of the regularizer. Default is True.
+    :param float alpha_s: alpha_s multiplier for the PGI smallness.
+    :param float or numpy.ndarray alpha_x: alpha_x multiplier for the 1st-derivative
+                        Smoothness terms in X-direction for each physical property.
+    :param float or numpy.ndarray alpha_y: alpha_y multiplier for the 1st-derivative
+                        Smoothness terms in Y-direction for each physical property.
+    :param float or numpy.ndarray alpha_z: alpha_z multiplier for the 1st-derivative
+                        Smoothness terms in Z-direction for each physical property.
+    :param float or numpy.ndarray alpha_x: alpha_x multiplier for the 2nd-derivatibe
+                        Smoothness terms in X-direction for each physical property.
+    :param float or numpy.ndarray alpha_y: alpha_y multiplier for the 2nd-derivatibe
+                        Smoothness terms in Y-direction for each physical property.
+    :param float or numpy.ndarray alpha_z: alpha_z multiplier for the 2nd-derivatibe
+                        Smoothness terms in Z-direction for each physical property.
+
+
+    Returns
+    -------
+
+    :param SimPEG.objective_function.ComboObjectiveFunction reg: Full regularization with simplePGIsmallness
+                        and smoothness terms for all physical properties in all direction.
+    """
+
+    if wiresmap is None:
+        if "indActive" in kwargs.keys():
+            indActive = kwargs.pop("indActive")
+            wrmp = Wires(("m", indActive.sum()))
+        else:
+            wrmp = Wires(("m", mesh.nC))
+    else:
+        wrmp = wiresmap
+
+    if maplist is None:
+        mplst = [IdentityMap(mesh) for maps in wrmp.maps]
+    else:
+        mplst = maplist
+
+    if cell_weights_list is None:
+        clwhtlst = [Identity() for maps in wrmp.maps]
+    else:
+        clwhtlst = cell_weights_list
+
+    reg = SimplePGI(
+        mesh=mesh,
+        gmmref=gmmref,
+        gmm=gmm,
+        wiresmap=wiresmap,
+        maplist=maplist,
+        approx_hessian=approx_hessian,
+        approx_gradient=approx_gradient,
+        approx_eval=approx_eval,
+        alpha_s=alpha_s,
+        alpha_x=0.0,
+        alpha_y=0.0,
+        alpha_z=0.0,
+        **kwargs
+    )
+
+    if cell_weights_list is not None:
+        reg.objfcts[0].cell_weights = np.hstack(clwhtlst)
+
+    if isinstance(alpha_x, float):
+        alph_x = alpha_x * np.ones(len(wrmp.maps))
+    else:
+        alph_x = alpha_x
+
+    if isinstance(alpha_y, float):
+        alph_y = alpha_y * np.ones(len(wrmp.maps))
+    else:
+        alph_y = alpha_y
+
+    if isinstance(alpha_z, float):
+        alph_z = alpha_z * np.ones(len(wrmp.maps))
+    else:
+        alph_z = alpha_z
+
+    for i, (wire, maps) in enumerate(zip(wrmp.maps, mplst)):
+        reg += Simple(
+            mesh=mesh,
+            mapping=maps * wire[1],
+            alpha_s=0.0,
+            alpha_x=alph_x[i],
+            alpha_y=alph_y[i],
+            alpha_z=alph_z[i],
+            cell_weights=clwhtlst[i],
+            **kwargs
+        )
+
+    return reg
+
+
+def make_PGI_GMMRF_continuity_regularization(
+    mesh,
+    gmmref,
+    gmm=None,
+    wiresmap=None,
+    maplist=None,
+    cell_weights_list=None,
+    approx_hessian=True,
+    approx_gradient=True,
+    approx_eval=True,
+    alpha_s=1.0,
+    alpha_x=1.0,
+    alpha_y=1.0,
+    alpha_z=1.0,
+    alpha_xx=0.0,
+    alpha_yy=0.0,
+    alpha_zz=0.0,
+    **kwargs
+):
+    """
+    Create a complete PGI regularization term ComboObjectiveFunction with all
+    necessary smallness and smoothness terms for any number of physical properties
+    and associated mapping.
+
+    Parameters
+    ----------
+
+    :param TensorMesh or TreeMesh mesh: TensorMesh or Treemesh object, used to weights
+                        the physical properties by cell volumes when updating the
+                        Gaussian Mixture Model (GMM)
+    :param WeightedGaussianMixture gmmref: reference GMM.
+    :param WeightedGaussianMixture gmm: Initial GMM. If not provided, gmmref is used.
+    :param Wires wiresmap: Wires map to obtain the various physical properties from the model.
+                        Optional for single physical property inversion. Required for multi-
+                        physical properties inversion.
+    :param list maplist: List of mapping for each physical property. Default is the IdentityMap for all.
+    :param list cell_weights_list: list of numpy.ndarray for the cells weight to apply to each physical property.
+    :param boolean approx_gradient: use the PGI least-squares approximation of the full nonlinear regularizer
+                        for computing the regularizer gradient. Default is True.
+    :param boolean approx_eval: use the PGI least-squares approximation of the full nonlinear regularizer
+                        for computing the value of the regularizer. Default is True.
+    :param float alpha_s: alpha_s multiplier for the PGI smallness.
+    :param float or numpy.ndarray alpha_x: alpha_x multiplier for the 1st-derivative
+                        Smoothness terms in X-direction for each physical property.
+    :param float or numpy.ndarray alpha_y: alpha_y multiplier for the 1st-derivative
+                        Smoothness terms in Y-direction for each physical property.
+    :param float or numpy.ndarray alpha_z: alpha_z multiplier for the 1st-derivative
+                        Smoothness terms in Z-direction for each physical property.
+    :param float or numpy.ndarray alpha_x: alpha_x multiplier for the 2nd-derivatibe
+                        Smoothness terms in X-direction for each physical property.
+    :param float or numpy.ndarray alpha_y: alpha_y multiplier for the 2nd-derivatibe
+                        Smoothness terms in Y-direction for each physical property.
+    :param float or numpy.ndarray alpha_z: alpha_z multiplier for the 2nd-derivatibe
+                        Smoothness terms in Z-direction for each physical property.
+
+
+    Returns
+    -------
+
+    :param SimPEG.objective_function.ComboObjectiveFunction reg: Full regularization with PGIsmallness
+                        and smoothness terms for all physical properties in all direction.
+    """
+
+    if wiresmap is None:
+        if "indActive" in kwargs.keys():
+            indActive = kwargs.pop("indActive")
+            wrmp = Wires(("m", indActive.sum()))
+        else:
+            wrmp = Wires(("m", mesh.nC))
+    else:
+        wrmp = wiresmap
+
+    if maplist is None:
+        mplst = [IdentityMap(mesh) for maps in wrmp.maps]
+    else:
+        mplst = maplist
+
+    if cell_weights_list is None:
+        clwhtlst = [Identity() for maps in wrmp.maps]
+    else:
+        clwhtlst = cell_weights_list
+
+    reg = PGI(
+        mesh=mesh,
+        gmmref=gmmref,
+        gmm=gmm,
+        wiresmap=wiresmap,
+        maplist=maplist,
+        approx_hessian=approx_hessian,
+        approx_gradient=approx_gradient,
+        approx_eval=approx_eval,
+        alpha_s=alpha_s,
+        alpha_x=0.0,
+        alpha_y=0.0,
+        alpha_z=0.0,
+        **kwargs
+    )
+
+    if cell_weights_list is not None:
+        reg.objfcts[0].cell_weights = np.hstack(clwhtlst)
+
+    if isinstance(alpha_x, float):
+        alph_x = alpha_x * np.ones(len(wrmp.maps))
+    else:
+        alph_x = alpha_x
+
+    if isinstance(alpha_y, float):
+        alph_y = alpha_y * np.ones(len(wrmp.maps))
+    else:
+        alph_y = alpha_y
+
+    if isinstance(alpha_z, float):
+        alph_z = alpha_z * np.ones(len(wrmp.maps))
+    else:
+        alph_z = alpha_z
+
+    for i, (wire, maps) in enumerate(zip(wrmp.maps, mplst)):
+        reg += Tikhonov(
+            mesh=mesh,
+            mapping=maps * wire[1],
+            alpha_s=0.0,
+            alpha_x=alph_x[i],
+            alpha_y=alph_y[i],
+            alpha_z=alph_z[i],
+            cell_weights=clwhtlst[i],
+            **kwargs
+        )
+
+    return reg
 
 class GaussianMixtureMarkovRandomField(WeightedGaussianMixture):
 
@@ -477,264 +737,3 @@ class GaussianMixtureMarkovRandomFieldWithPrior(GaussianMixtureWithPrior):
                                                         lower=True)
         else:
             self.precisions_cholesky_ = self.precisions_init
-
-
-def GibbsSampling_PottsDenoising(mesh, minit, log_univar, Pottmatrix,
-                                 indActive=None,
-                                 neighbors=8, norm=2,
-                                 weighted_selection=True,
-                                 compute_score=False,
-                                 maxit=None,
-                                 verbose=False,
-                                 anisotropies=None):
-
-    denoised = copy.deepcopy(minit)
-    # Compute Tree for neighbors finding
-    if mesh.dim == 1:
-        GRIDCC = mkvc(mesh.gridCC, numDims=2)
-    else:
-        GRIDCC = mesh.gridCC
-    if indActive is None:
-        pass
-    else:
-        GRIDCC = GRIDCC[indActive]
-
-        if self.index_kdtree is None:
-            self.index_kdtree = []
-            print('Computing rock unit specific KDTree, it may take several minutes.')
-            for i, anis in enumerate(self.index_anisotropy['anisotropy']):
-                self.index_kdtree.append(spatial.KDTree(self.unitxyz[i]))
-
-    tree = spatial.KDTree(GRIDCC)
-    n_components = log_univar.shape[1]
-
-    if weighted_selection or compute_score:
-        _, idx = tree.query(GRIDCC, k=neighbors + 1, p=norm)
-        idx = idx[:, 1:]
-
-    if weighted_selection:
-        logprobnoise = -np.sum(np.r_[[Pottmatrix[minit[j], minit[idx[j]]]
-                                      for j in range(len(minit))]], axis=1)
-        idxmin = np.where(logprobnoise == logprobnoise.min())
-        logprobnoise[idxmin] = -np.inf
-        probnoise = np.exp(logprobnoise - logsumexp(logprobnoise))
-        choice = np.arange(len(minit))
-        if maxit is None:
-            maxit = int(
-                (1 + len(GRIDCC) - len(idxmin[0])) * np.log(1 + len(GRIDCC) - len(idxmin[0])))
-            if verbose:
-                print('max iterations: ', maxit)
-
-    if compute_score:
-        logprob_obj = []
-        # Compute logprobability of the model, should increase
-        unnormlogprob = np.sum(np.r_[[log_univar[i, denoised[i]] for i in range(len(denoised))]]) + np.sum(
-            np.r_[[Pottmatrix[denoised[j], denoised[idx[j]]] for j in range(len(denoised))]])
-        logprob_obj.append(unnormlogprob)
-
-    if maxit is None:
-        maxit = int((mesh.nC) * np.log(mesh.nC))
-        if verbose:
-            print('max iterations: ', maxit)
-
-    for i in range(maxit):
-        # select random point and neighbors
-        if weighted_selection:
-            j = np.random.choice(choice, p=probnoise)
-            idxj = idx[j]
-        else:
-            j = np.random.randint(mesh.nC)
-            if not weighted_selection or compute_score:
-                _, idxj = tree.query(mesh.gridCC[j], k=neighbors, p=norm)
-
-        # compute Probability
-        postlogprob = np.zeros_like(log_univar[j])
-        for k in range(n_components):
-            postlogprob[k] = log_univar[j][k] + \
-                np.sum([Pottmatrix[k, denoised[idc]] for idc in idxj])
-        postprobj = np.exp(postlogprob - logsumexp(postlogprob))
-
-        denoised[j] = np.random.choice(np.arange(n_components), p=postprobj)
-
-        if compute_score:
-            # Compute logprobability of the model, should increase
-            unnormlogprob = np.sum(np.r_[[log_univar[i, denoised[i]] for i in range(len(denoised))]]) + np.sum(
-                np.r_[[Pottmatrix[denoised[j], denoised[idx[j]]] for j in range(len(denoised))]])
-            logprob_obj.append(unnormlogprob)
-
-        if weighted_selection:
-            # Update the probability of being noisy
-            logprobnoise[j] = - \
-                np.sum(np.r_[Pottmatrix[denoised[j], denoised[idx[j]]]])
-            probnoise = np.exp(logprobnoise - logsumexp(logprobnoise))
-
-    if compute_score and weighted_selection:
-        return [denoised, probnoise, logprob_obj]
-
-    elif not(compute_score or weighted_selection):
-        return [denoised]
-
-    elif compute_score:
-        return [denoised, logprob_obj]
-
-    elif weighted_selection:
-        return [denoised, probnoise]
-
-
-def ICM_PottsDenoising(mesh, minit, log_univar, Pottmatrix,
-                       indActive=None,
-                       neighbors=8, norm=2,
-                       weighted_selection=True,
-                       compute_score=False,
-                       maxit=None,
-                       maxit_factor=1.,
-                       max_probanoise=None,
-                       verbose=True,
-                       anisotropies=None):
-
-    denoised = copy.deepcopy(minit)
-    # Compute Tree for neighbors finding
-    if mesh.dim == 1:
-        GRIDCC = mkvc(mesh.gridCC, numDims=2)
-    else:
-        GRIDCC = mesh.gridCC
-    if indActive is None:
-        pass
-    else:
-        GRIDCC = GRIDCC[indActive]
-
-#if self.index_anisotropy is not None and self.mesh.gridCC.ndim != 1:
-
-#    self.unitxyz = []
-#    for i, anis in enumerate(self.index_anisotropy['anisotropy']):
-#        self.unitxyz.append((anis).dot(self.xyz.T).T)
-
-#    if self.index_kdtree is None:
-#        self.index_kdtree = []
-#        print('Computing rock unit specific KDTree, it may take several minutes.')
-#        for i, anis in enumerate(self.index_anisotropy['anisotropy']):
-#            self.index_kdtree.append(spatial.KDTree(self.unitxyz[i]))
-
-
-    #print('Computing new neighbors based on rock units, it may take several minutes.')
-    #for i, unitindex in enumerate(self.index_anisotropy['index']):
-#        _, self.indexpoint[unitindex] = self.index_kdtree[i].query(self.unitxyz[i][unitindex], k=self.kneighbors+1)
-
-#Find neighbors given the current state of data and model
-#if self.index_anisotropy is not None and self.mesh.gridCC.ndim != 1:
-#    prediction = self.predict(X)
-#    unit_index = []
-#    for i in range(self.n_components):
-#        unit_index.append(np.where(prediction==i)[0])
-#    for i, unitindex in enumerate(unit_index):
-#        _, self.indexpoint[unitindex] = self.index_kdtree[i].query(self.unitxyz[i][unitindex], k=self.kneighbors+1)
-
-    #compute all tree
-    #
-    tree = spatial.KDTree(GRIDCC)
-    n_components = log_univar.shape[1]
-    if anisotropies is not None:
-        treelist = []
-        ani_xyzlist = []
-        for anis in anisotropies['anisotropy']:
-            ani_xyzlist.append(anis.dot(GRIDCC.T).T)
-            treelist.append(spatial.KDTree(ani_xyzlist[-1]))
-
-    if weighted_selection or compute_score:
-        _, idx = tree.query(GRIDCC, k=neighbors + 1, p=norm)
-        idx = idx[:, 1:]
-
-        if anisotropies is not None:
-            idxlist=[]
-            for i, (anitree, xyz) in enumerate(zip(treelist,ani_xyzlist)):
-                _, idx_ani = anitree.query(xyz, k=neighbors + 1, p=anisotropies['norm'][i])
-                idx_ani = idx_ani[:, 1:]
-                idxlist.append(idx_ani)
-
-            n_units = Pottmatrix.shape[0]
-            unit_index = []
-            for i in range(n_units):
-                unit_index.append(np.where(denoised==i)[0])
-            for i, unitindex in enumerate(unit_index):
-                idx[unitindex] = idxlist[i][unitindex]
-
-    if weighted_selection:
-        logprobnoise = -np.sum(np.r_[[Pottmatrix[minit[j], minit[idx[j]]]
-                                      for j in range(len(minit))]], axis=1)
-        idxmin = np.where(logprobnoise == logprobnoise.min())
-        #logprobnoise[idxmin] = -np.inf
-        probnoise = np.exp(logprobnoise - logsumexp(logprobnoise))
-        probnoise = probnoise/np.sum(probnoise)
-        if max_probanoise is not None:
-            if any(probnoise>max_probanoise):
-                probnoise = np.minimum(probnoise,max_probanoise)
-                probnoise = probnoise/np.sum(probnoise)
-        choice = np.arange(len(minit))
-        if maxit is None:
-            maxit = int(
-                maxit_factor * (1 + len(GRIDCC) - len(idxmin[0])) * np.log(1 + len(GRIDCC) - len(idxmin[0])))
-            if verbose:
-                print('max iterations: ', maxit)
-
-    if compute_score:
-        logprob_obj = []
-        # Compute logprobability of the model, should increase
-        unnormlogprob = np.sum(np.r_[[log_univar[i, denoised[i]] for i in range(len(denoised))]]) + np.sum(
-            np.r_[[Pottmatrix[denoised[j], denoised[idx[j]]] for j in range(len(denoised))]])
-        logprob_obj.append(unnormlogprob)
-
-    if maxit is None:
-        maxit = int((mesh.nC) * np.log(mesh.nC))
-        if verbose:
-            print('max iterations: ', maxit)
-
-    for i in range(maxit):
-        # select random point and neighbors
-        if weighted_selection:
-            j = np.random.choice(choice, p=probnoise)
-            idxj = idx[j]
-        else:
-            j = np.random.randint(mesh.nC)
-            if not weighted_selection or compute_score:
-                _, idxj = tree.query(mesh.gridCC[j], k=neighbors, p=norm)
-
-        # compute Probability
-        postlogprob = np.zeros(n_components)
-        for k in range(n_components):
-            postlogprob[k] = log_univar[j][k] + \
-                np.sum([Pottmatrix[k, denoised[idc]] for idc in idxj])
-        postprobj = np.exp(postlogprob - logsumexp(postlogprob))
-
-        denoised[j] = np.argmax(postprobj)
-        #update kneighbors is anisotropy specific to unit
-        if anisotropies is not None:
-            idx[j] = idxlist[denoised[j]][j]
-
-        if compute_score:
-            # Compute logprobability of the model, should increase
-            unnormlogprob = np.sum(np.r_[[log_univar[i, denoised[i]] for i in range(len(denoised))]]) + np.sum(
-                np.r_[[Pottmatrix[denoised[j], denoised[idx[j]]] for j in range(len(denoised))]])
-            logprob_obj.append(unnormlogprob)
-
-        if weighted_selection:
-            # Update the probability of being noisy
-            logprobnoise[j] = - \
-                np.sum(np.r_[Pottmatrix[denoised[j], denoised[idx[j]]]])
-            probnoise = np.exp(logprobnoise - logsumexp(logprobnoise))
-            probnoise = probnoise/np.sum(probnoise)
-            if max_probanoise is not None:
-                if any(probnoise>max_probanoise):
-                    probnoise = np.minimum(probnoise,max_probanoise)
-                    probnoise = probnoise/np.sum(probnoise)
-
-    if compute_score and weighted_selection:
-        return [denoised, idx, probnoise, logprob_obj]
-
-    elif not(compute_score or weighted_selection):
-        return [denoised, idx]
-
-    elif compute_score:
-        return [denoised, idx, logprob_obj]
-
-    elif weighted_selection:
-        return [denoised, idx, probnoise]
