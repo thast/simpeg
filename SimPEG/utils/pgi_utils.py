@@ -39,6 +39,7 @@ def make_SimplePGI_regularization(
     wiresmap=None,
     maplist=None,
     cell_weights_list=None,
+    approx_hessian=True,
     approx_gradient=True,
     approx_eval=True,
     alpha_s=1.0,
@@ -119,6 +120,7 @@ def make_SimplePGI_regularization(
         gmm=gmm,
         wiresmap=wiresmap,
         maplist=maplist,
+        approx_hessian=approx_hessian,
         approx_gradient=approx_gradient,
         approx_eval=approx_eval,
         alpha_s=alpha_s,
@@ -168,6 +170,7 @@ def make_PGI_regularization(
     wiresmap=None,
     maplist=None,
     cell_weights_list=None,
+    approx_hessian=True,
     approx_gradient=True,
     approx_eval=True,
     alpha_s=1.0,
@@ -248,6 +251,7 @@ def make_PGI_regularization(
         gmm=gmm,
         wiresmap=wiresmap,
         maplist=maplist,
+        approx_hessian=approx_hessian,
         approx_gradient=approx_gradient,
         approx_eval=approx_eval,
         alpha_s=alpha_s,
@@ -841,7 +845,7 @@ class WeightedGaussianMixture(GaussianMixture):
         else:
             log_prob = np.empty((n_samples, n_components))
             for k, (mu, prec_chol) in enumerate(zip(means, precisions_chol)):
-                prec_chol_mat = np.eye(n_components) * prec_chol
+                prec_chol_mat = np.eye(n_features) * prec_chol
                 y = np.dot(X * sensW, prec_chol_mat) - np.dot(mu * sensW, prec_chol_mat)
                 log_prob[:, k] = np.sum(np.square(y), axis=1)
 
