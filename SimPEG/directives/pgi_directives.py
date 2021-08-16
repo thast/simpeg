@@ -125,7 +125,6 @@ class PGI_UpdateParameters(InversionDirective):
             elif self.update_gmm and isinstance(
                 self.pgi_reg.gmmref, GaussianMixtureMarkovRandomField
             ):
-                print('update GMMRF')
                 clfupdate = GaussianMixtureMarkovRandomFieldWithPrior(
                     gmmref=self.pgi_reg.gmmref,
                     #mesh=self.pgi_reg.gmmref.mesh,

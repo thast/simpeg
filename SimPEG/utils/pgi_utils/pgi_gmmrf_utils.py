@@ -21,9 +21,9 @@ from sklearn.mixture._gaussian_mixture import (
 )
 from sklearn.mixture._base import _check_X, check_random_state, ConvergenceWarning
 import warnings
-from .mat_utils import mkvc
-from ..maps import IdentityMap, Wires
-from ..regularization import (
+from ..mat_utils import mkvc
+from ...maps import IdentityMap, Wires
+from ...regularization import (
     SimplePGI,
     Simple,
     PGI,

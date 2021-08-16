@@ -24,7 +24,3 @@ from .pgi_directives import (
     PGI_BetaAlphaSchedule,
     PGI_AddMrefInSmooth,
 )
-
-from .pgi_gmmrf_directives import (
-    PGI_GMMRF_IsingModel
-)
