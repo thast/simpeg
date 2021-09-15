@@ -113,6 +113,13 @@ class SimplePGIsmallness(BaseRegularization):
         model = np.c_[[a * b for a, b in zip(self.maplist, modellist)]].T
         return self.gmm.predict(model)  # mkvc(m, numDims=2))
 
+    def compute_quasi_geology_model(self):
+        #used once mref is built
+        mreflist = self.wiresmap * self.mref
+        mrefarray = np.c_[[a * b for a, b in zip(self.maplist, mreflist)]].T
+        return np.c_[[((mrefarray - mean)**2).sum(axis=1) for mean in self.gmm.means_]].argmin(axis=0)
+
+
     @timeIt
     def __call__(self, m, externalW=True):
 
@@ -125,7 +132,7 @@ class SimplePGIsmallness(BaseRegularization):
             self.mref = mkvc(self.gmm.means_[self.membership(m)])
 
         if self.approx_eval:
-            membership = self.membership(self.mref)
+            membership = self.compute_quasi_geology_model()
             dm = self.wiresmap * (m)
             dmref = self.wiresmap * (self.mref)
             dmm = np.c_[[a * b for a, b in zip(self.maplist, dm)]].T
@@ -183,7 +190,7 @@ class SimplePGIsmallness(BaseRegularization):
         if getattr(self, "mref", None) is None:
             self.mref = mkvc(self.gmm.means_[self.membership(m)])
 
-        membership = self.membership(self.mref)
+        membership = self.compute_quasi_geology_model()
         modellist = self.wiresmap * m
         mreflist = self.wiresmap * self.mref
         mD = [a.deriv(b) for a, b in zip(self.maplist, modellist)]
@@ -342,7 +349,7 @@ class SimplePGIsmallness(BaseRegularization):
         if self.approx_hessian:
             # we approximate it with the covariance of the cluster
             # whose each point belong
-            membership = self.membership(self.mref)
+            membership = self.compute_quasi_geology_model()
             modellist = self.wiresmap * m
             mD = [a.deriv(b) for a, b in zip(self.maplist, modellist)]
             mD = sp.block_diag(mD)
@@ -530,44 +537,6 @@ class SimplePGI(SimpleComboRegularization):
                 **kwargs
             )
         ]
-        objfcts += [
-            SimpleSmoothDeriv(
-                mesh=mesh, orientation="x", mapping=maps * wire[1], **kwargs
-            )
-            for wire, maps in zip(self._wiresmap.maps, self._maplist)
-        ]
-        objfcts += [
-            SmoothDeriv2(mesh=mesh, orientation="x", mapping=maps * wire[1], **kwargs)
-            for wire, maps in zip(self._wiresmap.maps, self._maplist)
-        ]
-
-        if mesh.dim > 1:
-            objfcts += [
-                SimpleSmoothDeriv(
-                    mesh=mesh, orientation="y", mapping=maps * wire[1], **kwargs
-                )
-                for wire, maps in zip(self._wiresmap.maps, self._maplist)
-            ]
-            objfcts += [
-                SmoothDeriv2(
-                    mesh=mesh, orientation="y", mapping=maps * wire[1], **kwargs
-                )
-                for wire, maps in zip(self._wiresmap.maps, self._maplist)
-            ]
-
-        if mesh.dim > 2:
-            objfcts += [
-                SimpleSmoothDeriv(
-                    mesh=mesh, orientation="z", mapping=maps * wire[1], **kwargs
-                )
-                for wire, maps in zip(self._wiresmap.maps, self._maplist)
-            ]
-            objfcts += [
-                SmoothDeriv2(
-                    mesh=mesh, orientation="z", mapping=maps * wire[1], **kwargs
-                )
-                for wire, maps in zip(self._wiresmap.maps, self._maplist)
-            ]
 
         super(SimplePGI, self).__init__(
             mesh=mesh,
@@ -599,6 +568,9 @@ class SimplePGI(SimpleComboRegularization):
 
     def membership(self, m):
         return self.objfcts[0].membership(m)
+
+    def compute_quasi_geology_model(self):
+        return self.objfcts[0].compute_quasi_geology_model()
 
     @property
     def wiresmap(self):
@@ -709,6 +681,14 @@ class PGIsmallness(SimplePGIsmallness):
         """
         if self.cell_weights is not None:
             if len(self.cell_weights) == self.wiresmap.nP:
+                return sdiag(np.sqrt(self.cell_weights))
+            else:
+                return sp.kron(
+                    speye(len(self.wiresmap.maps)), sdiag(np.sqrt(self.cell_weights))
+                )
+
+        if self.cell_weights is not None:
+            if len(self.cell_weights) == self.wiresmap.nP:
                 return (
                     sp.kron(
                         speye(len(self.wiresmap.maps)),
@@ -787,42 +767,6 @@ class PGI(SimpleComboRegularization):
                 **kwargs
             )
         ]
-        objfcts += [
-            SmoothDeriv(mesh=mesh, orientation="x", mapping=maps * wire[1], **kwargs)
-            for wire, maps in zip(self._wiresmap.maps, self._maplist)
-        ]
-        objfcts += [
-            SmoothDeriv2(mesh=mesh, orientation="x", mapping=maps * wire[1], **kwargs)
-            for wire, maps in zip(self._wiresmap.maps, self._maplist)
-        ]
-
-        if mesh.dim > 1:
-            objfcts += [
-                SmoothDeriv(
-                    mesh=mesh, orientation="y", mapping=maps * wire[1], **kwargs
-                )
-                for wire, maps in zip(self._wiresmap.maps, self._maplist)
-            ]
-            objfcts += [
-                SmoothDeriv2(
-                    mesh=mesh, orientation="y", mapping=maps * wire[1], **kwargs
-                )
-                for wire, maps in zip(self._wiresmap.maps, self._maplist)
-            ]
-
-        if mesh.dim > 2:
-            objfcts += [
-                SmoothDeriv(
-                    mesh=mesh, orientation="z", mapping=maps * wire[1], **kwargs
-                )
-                for wire, maps in zip(self._wiresmap.maps, self._maplist)
-            ]
-            objfcts += [
-                SmoothDeriv2(
-                    mesh=mesh, orientation="z", mapping=maps * wire[1], **kwargs
-                )
-                for wire, maps in zip(self._wiresmap.maps, self._maplist)
-            ]
 
         super(PGI, self).__init__(
             mesh=mesh,
@@ -854,6 +798,9 @@ class PGI(SimpleComboRegularization):
 
     def membership(self, m):
         return self.objfcts[0].membership(m)
+
+    def compute_quasi_geology_model(self):
+        return self.objfcts[0].compute_quasi_geology_model()
 
     @property
     def wiresmap(self):
@@ -995,6 +942,13 @@ class SimplePGIwithNonlinearRelationshipsSmallness(BaseRegularization):
         model = np.c_[[a * b for a, b in zip(self.maplist, modellist)]].T
         return self.gmm.predict(model)
 
+    def compute_quasi_geology_model(self):
+        #used once mref is built
+        mreflist = self.wiresmap * self.mref
+        mrefarray = np.c_[[a * b for a, b in zip(self.maplist, mreflist)]].T
+        return np.c_[[((mrefarray - mean)**2).sum(axis=1) for mean in self.gmm.means_]].argmin(axis=0)
+
+
     @timeIt
     def __call__(self, m, externalW=True):
 
@@ -1007,7 +961,7 @@ class SimplePGIwithNonlinearRelationshipsSmallness(BaseRegularization):
             self.mref = mkvc(self.gmm.means_[self.membership(m)])
 
         if self.approx_eval:
-            membership = self.membership(self.mref)
+            membership = self.compute_quasi_geology_model()
             dm = self.wiresmap * (m)
             dmref = self.wiresmap * (self.mref)
             dmm = np.c_[[a * b for a, b in zip(self.maplist, dm)]].T
@@ -1065,7 +1019,7 @@ class SimplePGIwithNonlinearRelationshipsSmallness(BaseRegularization):
         if getattr(self, "mref", None) is None:
             self.mref = mkvc(self.gmm.means_[self.membership(m)])
 
-        membership = self.membership(self.mref)
+        membership = self.compute_quasi_geology_model()
         modellist = self.wiresmap * m
         dmmodel = np.c_[[a * b for a, b in zip(self.maplist, modellist)]].T
         mreflist = self.wiresmap * self.mref
@@ -1114,7 +1068,7 @@ class SimplePGIwithNonlinearRelationshipsSmallness(BaseRegularization):
         # For a positive definite Hessian,
         # we approximate it with the covariance of the cluster
         # whose each point belong
-        membership = self.membership(self.mref)
+        membership = self.compute_quasi_geology_model()
         modellist = self.wiresmap * m
         dmmodel = np.c_[[a * b for a, b in zip(self.maplist, modellist)]].T
         mD = [a.deriv(b) for a, b in zip(self.maplist, modellist)]
@@ -1263,44 +1217,6 @@ class SimplePGIwithRelationships(SimpleComboRegularization):
                 **kwargs
             )
         ]
-        objfcts += [
-            SimpleSmoothDeriv(
-                mesh=mesh, orientation="x", mapping=maps * wire[1], **kwargs
-            )
-            for wire, maps in zip(self._wiresmap.maps, self._maplist)
-        ]
-        objfcts += [
-            SmoothDeriv2(mesh=mesh, orientation="x", mapping=maps * wire[1], **kwargs)
-            for wire, maps in zip(self._wiresmap.maps, self._maplist)
-        ]
-
-        if mesh.dim > 1:
-            objfcts += [
-                SimpleSmoothDeriv(
-                    mesh=mesh, orientation="y", mapping=maps * wire[1], **kwargs
-                )
-                for wire, maps in zip(self._wiresmap.maps, self._maplist)
-            ]
-            objfcts += [
-                SmoothDeriv2(
-                    mesh=mesh, orientation="y", mapping=maps * wire[1], **kwargs
-                )
-                for wire, maps in zip(self._wiresmap.maps, self._maplist)
-            ]
-
-        if mesh.dim > 2:
-            objfcts += [
-                SimpleSmoothDeriv(
-                    mesh=mesh, orientation="z", mapping=maps * wire[1], **kwargs
-                )
-                for wire, maps in zip(self._wiresmap.maps, self._maplist)
-            ]
-            objfcts += [
-                SmoothDeriv2(
-                    mesh=mesh, orientation="z", mapping=maps * wire[1], **kwargs
-                )
-                for wire, maps in zip(self._wiresmap.maps, self._maplist)
-            ]
 
         super(SimplePGIwithRelationships, self).__init__(
             mesh=mesh,
@@ -1333,6 +1249,9 @@ class SimplePGIwithRelationships(SimpleComboRegularization):
     # @classmethod
     def membership(self, m):
         return self.objfcts[0].membership(m)
+
+    def compute_quasi_geology_model(self):
+        return self.objfcts[0].compute_quasi_geology_model()
 
     @property
     def wiresmap(self):

@@ -1,3 +1,14 @@
+"""
+Petrophysically guided inversion: Joint linear example with nonlinear relationships
+===================================================================================
+
+We do a comparison between the classic Tikhonov inversion
+and our formulation of a petrophysically guided inversion.
+We explore it through coupling two linear problems whose respective physical
+properties are linked by polynomial relationships that change between rock units.
+
+"""
+
 import discretize as Mesh
 from SimPEG import (
     simulation,
@@ -191,6 +202,11 @@ scales = directives.ScalingMultipleDataMisfits_ByEig(
     chi0_ratio=np.r_[1.0, 1.0], verbose=True, n_pw_iter=10
 )
 scaling_schedule = directives.JointScalingSchedule(verbose=True)
+alpha0_ratio = np.r_[
+    np.zeros(len(reg_simple_no_map.objfcts[0].objfcts)),
+    100.0 * np.ones(len(reg_simple_no_map.objfcts[1].objfcts)),
+    1.0 * np.ones(len(reg_simple_no_map.objfcts[2].objfcts)),
+]
 alphas = directives.AlphasSmoothEstimate_ByEig(
     alpha0_ratio=alpha0_ratio, n_pw_iter=10, verbose=True
 )
