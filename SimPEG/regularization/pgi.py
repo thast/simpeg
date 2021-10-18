@@ -114,11 +114,12 @@ class SimplePGIsmallness(BaseRegularization):
         return self.gmm.predict(model)  # mkvc(m, numDims=2))
 
     def compute_quasi_geology_model(self):
-        #used once mref is built
+        # used once mref is built
         mreflist = self.wiresmap * self.mref
         mrefarray = np.c_[[a * b for a, b in zip(self.maplist, mreflist)]].T
-        return np.c_[[((mrefarray - mean)**2).sum(axis=1) for mean in self.gmm.means_]].argmin(axis=0)
-
+        return np.c_[
+            [((mrefarray - mean) ** 2).sum(axis=1) for mean in self.gmm.means_]
+        ].argmin(axis=0)
 
     @timeIt
     def __call__(self, m, externalW=True):
@@ -604,7 +605,8 @@ class SimplePGI(SimpleComboRegularization):
 
     @approx_gradient.setter
     def approx_gradient(self, ap):
-        if ap is not None:
+        if not isinstance(ap, bool):
+            raise ValueError(f"Value provided for 'approx_gradient' must be of type 'bool'. Provided {value}")
             self._approx_gradient = ap
         self.objfcts[0].approx_gradient = self.approx_gradient
 
@@ -616,7 +618,8 @@ class SimplePGI(SimpleComboRegularization):
 
     @approx_hessian.setter
     def approx_hessian(self, ap):
-        if ap is not None:
+        if not isinstance(ap, bool):
+            raise ValueError(f"Value provided for 'approx_hessian' must be of type 'bool'. Provided {value}")
             self._approx_hessian = ap
         self.objfcts[0].approx_hessian = self.approx_hessian
 
@@ -628,7 +631,8 @@ class SimplePGI(SimpleComboRegularization):
 
     @approx_eval.setter
     def approx_eval(self, ap):
-        if ap is not None:
+        if not isinstance(ap, bool):
+            raise ValueError(f"Value provided for 'approx_eval' must be of type 'bool'. Provided {value}")
             self._approx_eval = ap
         self.objfcts[0].approx_eval = self.approx_eval
 
@@ -679,13 +683,6 @@ class PGIsmallness(SimplePGIsmallness):
         Weighting matrix
         Need to change the size to match self.wiresmap.maps * mesh.nC
         """
-        if self.cell_weights is not None:
-            if len(self.cell_weights) == self.wiresmap.nP:
-                return sdiag(np.sqrt(self.cell_weights))
-            else:
-                return sp.kron(
-                    speye(len(self.wiresmap.maps)), sdiag(np.sqrt(self.cell_weights))
-                )
 
         if self.cell_weights is not None:
             if len(self.cell_weights) == self.wiresmap.nP:
@@ -943,11 +940,12 @@ class SimplePGIwithNonlinearRelationshipsSmallness(BaseRegularization):
         return self.gmm.predict(model)
 
     def compute_quasi_geology_model(self):
-        #used once mref is built
+        # used once mref is built
         mreflist = self.wiresmap * self.mref
         mrefarray = np.c_[[a * b for a, b in zip(self.maplist, mreflist)]].T
-        return np.c_[[((mrefarray - mean)**2).sum(axis=1) for mean in self.gmm.means_]].argmin(axis=0)
-
+        return np.c_[
+            [((mrefarray - mean) ** 2).sum(axis=1) for mean in self.gmm.means_]
+        ].argmin(axis=0)
 
     @timeIt
     def __call__(self, m, externalW=True):
