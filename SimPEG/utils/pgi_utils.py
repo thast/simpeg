@@ -19,10 +19,10 @@ from sklearn.mixture._gaussian_mixture import (
     _check_precisions,
     _check_shape,
 )
-from sklearn.mixture._base import _check_X, check_random_state, ConvergenceWarning
+from sklearn.mixture._base import check_random_state, ConvergenceWarning
 import warnings
 from .mat_utils import mkvc
-from ..maps import IdentityMap, Wires
+from ..maps import IdentityMap, Wires, Identity
 from ..regularization import (
     SimplePGI,
     Simple,
@@ -54,10 +54,8 @@ def make_SimplePGI_regularization(
     Create a complete SimplePGI regularization term ComboObjectiveFunction with all
     necessary smallness and smoothness terms for any number of physical properties
     and associated mapping.
-
     Parameters
     ----------
-
     :param TensorMesh or TreeMesh mesh: TensorMesh or Treemesh object, used to weights
                         the physical properties by cell volumes when updating the
                         Gaussian Mixture Model (GMM)
@@ -85,11 +83,8 @@ def make_SimplePGI_regularization(
                         Smoothness terms in Y-direction for each physical property.
     :param float or numpy.ndarray alpha_z: alpha_z multiplier for the 2nd-derivatibe
                         Smoothness terms in Z-direction for each physical property.
-
-
     Returns
     -------
-
     :param SimPEG.objective_function.ComboObjectiveFunction reg: Full regularization with simplePGIsmallness
                         and smoothness terms for all physical properties in all direction.
     """
@@ -109,7 +104,7 @@ def make_SimplePGI_regularization(
         mplst = maplist
 
     if cell_weights_list is None:
-        clwhtlst = [Identity() for maps in wrmp.maps]
+        clwhtlst = [np.ones(maps[1].shape[0]) for maps in wrmp.maps]
     else:
         clwhtlst = cell_weights_list
 
@@ -183,10 +178,8 @@ def make_PGI_regularization(
     Create a complete PGI regularization term ComboObjectiveFunction with all
     necessary smallness and smoothness terms for any number of physical properties
     and associated mapping.
-
     Parameters
     ----------
-
     :param TensorMesh or TreeMesh mesh: TensorMesh or Treemesh object, used to weights
                         the physical properties by cell volumes when updating the
                         Gaussian Mixture Model (GMM)
@@ -214,11 +207,8 @@ def make_PGI_regularization(
                         Smoothness terms in Y-direction for each physical property.
     :param float or numpy.ndarray alpha_z: alpha_z multiplier for the 2nd-derivatibe
                         Smoothness terms in Z-direction for each physical property.
-
-
     Returns
     -------
-
     :param SimPEG.objective_function.ComboObjectiveFunction reg: Full regularization with PGIsmallness
                         and smoothness terms for all physical properties in all direction.
     """
@@ -226,7 +216,7 @@ def make_PGI_regularization(
     if wiresmap is None:
         if "indActive" in kwargs.keys():
             indActive = kwargs.pop("indActive")
-            wrmp = Wires(("m", indActive.sum()))
+            wrmp = Wires(("m", int(indActive.sum())))
         else:
             wrmp = Wires(("m", mesh.nC))
     else:
@@ -238,7 +228,7 @@ def make_PGI_regularization(
         mplst = maplist
 
     if cell_weights_list is None:
-        clwhtlst = [Identity() for maps in wrmp.maps]
+        clwhtlst = [np.ones(maps[1].shape[0]) for maps in wrmp.maps]
     else:
         clwhtlst = cell_weights_list
 
@@ -312,10 +302,8 @@ def make_SimplePGIwithRelationships_regularization(
     Create a complete PGI, with nonlinear relationships, regularization term ComboObjectiveFunction with all
     necessary smallness and smoothness terms for any number of physical properties
     and associated mapping.
-
     Parameters
     ----------
-
     :param TensorMesh or TreeMesh mesh: TensorMesh or Treemesh object, used to weights
                         the physical properties by cell volumes when updating the
                         Gaussian Mixture Model (GMM)
@@ -343,11 +331,8 @@ def make_SimplePGIwithRelationships_regularization(
                         Smoothness terms in Y-direction for each physical property.
     :param float or numpy.ndarray alpha_z: alpha_z multiplier for the 2nd-derivatibe
                         Smoothness terms in Z-direction for each physical property.
-
-
     Returns
     -------
-
     :param SimPEG.objective_function.ComboObjectiveFunction reg: Full regularization with
                         SimplePGIwithNonlinearRelationshipsSmallness and smoothness terms
                         for all physical properties in all direction.
@@ -364,7 +349,7 @@ def make_SimplePGIwithRelationships_regularization(
         mplst = maplist
 
     if cell_weights_list is None:
-        clwhtlst = [Identity() for maps in wrmp.maps]
+        clwhtlst = [np.ones(maps[1].shape[0]) for maps in wrmp.maps]
     else:
         clwhtlst = cell_weights_list
 
@@ -435,15 +420,12 @@ class WeightedGaussianMixture(GaussianMixture):
         mesh-free evaluation of the clusters of the geophysical model.
         2: When set manually, the proportions can be set either globally (normal behavior)
         or cell-by-cell (improvements)
-
     Disclaimer: this class built upon the GaussianMixture class from Scikit-Learn.
     New functionalitie are added, as well as modifications to
     existing functions, to serve the purposes pursued within SimPEG.
     This use is allowed by the Scikit-Learn licensing (BSD-3-Clause License)
     and we are grateful for their contributions to the open-source community.
-
     Addtional parameters to provide, compared to sklearn.mixture.gaussian_mixture:
-
     :param discretize.BaseMesh (TensorMesh or QuadTree or Octree) mesh: the volume
         of the cells give each sample/observations its weight in the fitting proces
     :param numpy.ndarry actv: (optional) active cells index
@@ -542,11 +524,9 @@ class WeightedGaussianMixture(GaussianMixture):
     def order_clusters_GM_weight(self, outputindex=False):
         """
         order clusters by decreasing weights
-
         PARAMETERS
         ----------
         :param boolean outputindex: if True, return the sorting index
-
         RETURN
         ------
         :return np.ndarray indx: sorting index
@@ -600,7 +580,7 @@ class WeightedGaussianMixture(GaussianMixture):
             _check_shape(weights, (n_components,), "weights")
 
         # check range
-        if np.less(weights, 0.0).any() or (np.greater(weights, 1.0)).any():
+        if any(np.less(weights, 0.0)) or any(np.greater(weights, 1.0)):
             raise ValueError(
                 "The parameter 'weights' should be in the range "
                 "[0, 1], but got max value %.5f, min value %.5f"
@@ -649,7 +629,7 @@ class WeightedGaussianMixture(GaussianMixture):
 
     def _initialize_parameters(self, X, random_state):
         """
-        [modified from Scikit-Learn.mixture.gaussian_mixture]
+        [modified from Scikit-Learn.mixture._base]
         Initialize the model parameters.
         Parameters
         ----------
@@ -841,7 +821,7 @@ class WeightedGaussianMixture(GaussianMixture):
         else:
             log_prob = np.empty((n_samples, n_components))
             for k, (mu, prec_chol) in enumerate(zip(means, precisions_chol)):
-                prec_chol_mat = np.eye(n_components) * prec_chol
+                prec_chol_mat = np.eye(n_features) * prec_chol
                 y = np.dot(X * sensW, prec_chol_mat) - np.dot(mu * sensW, prec_chol_mat)
                 log_prob[:, k] = np.sum(np.square(y), axis=1)
 
@@ -885,7 +865,7 @@ class WeightedGaussianMixture(GaussianMixture):
             Log probabilities of each data point in X.
         """
         check_is_fitted(self)
-        X = _check_X(X, None, self.means_.shape[1])
+        X = self._validate_data(X, reset=False)
 
         return logsumexp(self._estimate_weighted_log_prob_with_sensW(X, sensW), axis=1)
 
@@ -894,7 +874,6 @@ class GaussianMixtureWithPrior(WeightedGaussianMixture):
     """
     This class built upon the WeightedGaussianMixture, which itself built upon from
     the mixture.gaussian_mixture.GaussianMixture class from Scikit-Learn.
-
     In addition to weights samples/observations by the cells volume of the mesh,
     this class uses a posterior approach to fit the GMM parameters. This means
     it takes prior parameters, passed through `WeightedGaussianMixture` gmmref.
@@ -902,15 +881,12 @@ class GaussianMixtureWithPrior(WeightedGaussianMixture):
     defined through a conjugate or semi-conjugate approach (prior_type), to the choice of the user.
     See Astic & Oldenburg 2019: A framework for petrophysically and geologically
     guided geophysical inversion (https://doi.org/10.1093/gji/ggz389) for more information.
-
     Disclaimer: this class built upon the GaussianMixture class from Scikit-Learn.
     New functionalitie are added, as well as modifications to
     existing functions, to serve the purposes pursued within SimPEG.
     This use is allowed by the Scikit-Learn licensing (BSD-3-Clause License)
     and we are grateful for their contributions to the open-source community.
-
     Addtional parameters to provide, compared to `WeightedGaussianMixture`:
-
     :param numpy.ndarray kappa: strength of the confidence in the prior means
     :param numpy.ndarry nu: strength of the confidence in the prior covariances
     :param numpy.ndarry zeta: strength of the confidence in the prior proportions
@@ -983,20 +959,15 @@ class GaussianMixtureWithPrior(WeightedGaussianMixture):
         Arrange the clusters of gmm in the same order as those of gmmref,
         based on their relative similarities and priorizing first the most proeminent
         clusters (highest proportions)
-
         PARAMETERS
         ----------
-
         :param GaussianMixture gmm: Gaussian Mixture Model (GMM) to reorder.
         :param GaussianMixture gmmref: reference GMM.
         :param boolean outputindex: if True, return the ordering index for the clusters of gmm.
                                 Default is False.
-
         RETURN
         ------
-
         :param numpy.ndarray indx: Optional, return the ordering index for the clusters of gmm
-
         """
         self.order_clusters_GM_weight()
 
@@ -1132,32 +1103,70 @@ class GaussianMixtureWithPrior(WeightedGaussianMixture):
     def fit(self, X, y=None, debug=False):
         """
         [modified from Scikit-Learn for Maximum A Posteriori estimates (MAP)]
-        Estimate model parameters with the MAP-EM algorithm.
-        The method fit the model `n_init` times and set the parameters with
+        Estimate model parameters with the EM algorithm.
+        The method fits the model ``n_init`` times and sets the parameters with
         which the model has the largest likelihood or lower bound. Within each
-        trial, the method iterates between E-step and M-step for `max_iter`
+        trial, the method iterates between E-step and M-step for ``max_iter``
         times until the change of likelihood or lower bound is less than
-        `tol`, otherwise, a `ConvergenceWarning` is raised.
+        ``tol``, otherwise, a ``ConvergenceWarning`` is raised.
+        If ``warm_start`` is ``True``, then ``n_init`` is ignored and a single
+        initialization is performed upon the first call. Upon consecutive
+        calls, training starts where it left off.
         Parameters
         ----------
         X : array-like, shape (n_samples, n_features)
             List of n_features-dimensional data points. Each row
             corresponds to a single data point.
+        y : Ignored
+            Not used, present for API consistency by convention.
         Returns
         -------
-        self
+        self : object
+            The fitted mixture.
+        """
+        self.fit_predict(X, y, debug)
+        return self
+
+    def fit_predict(self, X, y=None, debug=False):
+        """[modified from Scikit-Learn for Maximum A Posteriori estimates (MAP)]
+        Estimate model parameters using X and predict the labels for X.
+        The method fits the model n_init times and sets the parameters with
+        which the model has the largest likelihood or lower bound. Within each
+        trial, the method iterates between E-step and M-step for `max_iter`
+        times until the change of likelihood or lower bound is less than
+        `tol`, otherwise, a :class:`~sklearn.exceptions.ConvergenceWarning` is
+        raised. After fitting, it predicts the most probable label for the
+        input data points.
+        .. versionadded:: 0.20
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            List of n_features-dimensional data points. Each row
+            corresponds to a single data point.
+        y : Ignored
+            Not used, present for API consistency by convention.
+        Returns
+        -------
+        labels : array, shape (n_samples,)
+            Component labels.
         """
         if self.verbose:
             print("modified from scikit-learn")
 
-        X = _check_X(X, self.n_components)
+        X = self._validate_data(X, dtype=[np.float64, np.float32], ensure_min_samples=2)
+        if X.shape[0] < self.n_components:
+            raise ValueError(
+                "Expected n_samples >= n_components "
+                f"but got n_components = {self.n_components}, "
+                f"n_samples = {X.shape[0]}"
+            )
         self._check_initial_parameters(X)
 
         # if we enable warm_start, we will have a unique initialisation
         do_init = not (self.warm_start and hasattr(self, "converged_"))
         n_init = self.n_init if do_init else 1
 
-        max_lower_bound = -np.infty
+        max_lower_bound = -np.inf
         self.converged_ = False
 
         random_state = check_random_state(self.random_state)
@@ -1168,10 +1177,11 @@ class GaussianMixtureWithPrior(WeightedGaussianMixture):
 
             if do_init:
                 self._initialize_parameters(X, random_state)
-                self.lower_bound_ = -np.infty
 
-            for n_iter in range(self.max_iter):
-                prev_lower_bound = self.lower_bound_
+            lower_bound = -np.inf if do_init else self.lower_bound_
+
+            for n_iter in range(1, self.max_iter + 1):
+                prev_lower_bound = lower_bound
 
                 log_prob_norm, log_resp = self._e_step(X)
 
@@ -1192,19 +1202,19 @@ class GaussianMixtureWithPrior(WeightedGaussianMixture):
                     aux[np.arange(len(aux)), self.fixed_membership[:, 1]] = 1
                     self.weights_[self.fixed_membership[:, 0]] = aux
 
-                self.lower_bound_ = self._compute_lower_bound(log_resp, log_prob_norm)
+                lower_bound = self._compute_lower_bound(log_resp, log_prob_norm)
 
-                change = self.lower_bound_ - prev_lower_bound
+                change = lower_bound - prev_lower_bound
                 self._print_verbose_msg_iter_end(n_iter, change)
 
                 if abs(change) < self.tol:
                     self.converged_ = True
                     break
 
-            self._print_verbose_msg_init_end(self.lower_bound_)
+            self._print_verbose_msg_init_end(lower_bound)
 
-            if self.lower_bound_ > max_lower_bound:
-                max_lower_bound = self.lower_bound_
+            if lower_bound > max_lower_bound or max_lower_bound == -np.inf:
+                max_lower_bound = lower_bound
                 best_params = self._get_parameters()
                 best_n_iter = n_iter
 
@@ -1219,7 +1229,7 @@ class GaussianMixtureWithPrior(WeightedGaussianMixture):
 
         self._set_parameters(best_params)
         self.n_iter_ = best_n_iter
-        self.last_step_change = change
+        self.lower_bound_ = max_lower_bound
 
         return self
 
@@ -1228,21 +1238,17 @@ class GaussianMixtureWithNonlinearRelationships(WeightedGaussianMixture):
     """
     This class built upon the WeightedGaussianMixture, which itself built upon from
     the mixture.gaussian_mixture.GaussianMixture class from Scikit-Learn.
-
     In addition to weights samples/observations by the cells volume of the mesh,
     this class can be given specified nonlinear relationships between physical properties.
     (polynomial etc.) Those nonlinear relationships are given in the form of a
     list of mapping (cluster_mapping argument). Functions are added and modified
     to fill that purpose, in particular the `fit` and  `samples` functions.
-
     Disclaimer: this class built upon the GaussianMixture class from Scikit-Learn.
     New functionalitie are added, as well as modifications to
     existing functions, to serve the purposes pursued within SimPEG.
     This use is allowed by the Scikit-Learn licensing (BSD-3-Clause License)
     and we are grateful for their contributions to the open-source community.
-
     Addtional parameters to provide, compared to `WeightedGaussianMixture`:
-
     :param list cluster_mapping (n_components, ): list of mapping describing
         a nonlinear relationships between physical properties; one per cluster/unit.
     """
@@ -1434,20 +1440,16 @@ class GaussianMixtureWithNonlinearRelationships(WeightedGaussianMixture):
         [modified from Scikit-Learn.mixture.gaussian_mixture]
         Generate random samples from the fitted Gaussian distribution
         with nonlinear relationships.
-
         Parameters
         ----------
         n_samples : int, optional
             Number of samples to generate. Defaults to 1.
-
         Returns
         -------
         X : array, shape (n_samples, n_features)
             Randomly generated sample
-
         y : array, shape (nsamples,)
             Component labels
-
         """
         check_is_fitted(self)
 
@@ -1529,7 +1531,6 @@ class GaussianMixtureWithNonlinearRelationshipsWithPrior(GaussianMixtureWithPrio
     This class built upon the `GaussianMixtureWithPrior`, which itself built upon from
     the `WeightedGaussianMixture`, built up from the
     mixture.gaussian_mixture.GaussianMixture class from Scikit-Learn.
-
     In addition to weights samples/observations by the cells volume of the mesh
     (from `WeightedGaussianMixture`), and nonlinear relationships for each cluster
     (from `GaussianMixtureWithNonlinearRelationships`), this class uses a
@@ -1539,18 +1540,14 @@ class GaussianMixtureWithNonlinearRelationshipsWithPrior(GaussianMixtureWithPrio
     defined through a conjugate or semi-conjugate approach (prior_type), to the choice of the user.
     See Astic & Oldenburg 2019: A framework for petrophysically and geologically
     guided geophysical inversion (https://doi.org/10.1093/gji/ggz389) for more information.
-
     Disclaimer: this class built upon the GaussianMixture class from Scikit-Learn.
     New functionalitie are added, as well as modifications to
     existing functions, to serve the purposes pursued within SimPEG.
     This use is allowed by the Scikit-Learn licensing (BSD-3-Clause License)
     and we are grateful for their contributions to the open-source community.
-
     Addtional parameters to provide, compared to `GaussianMixtureWithPrior`:
-
     :param list cluster_mapping (n_components, ): list of mapping describing
         a nonlinear relationships between physical properties; one per cluster/unit.
-
     """
 
     def __init__(
