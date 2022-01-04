@@ -873,7 +873,7 @@ class WeightedGaussianMixture(GaussianMixture):
             labelx = "membership"
         else:
             rvx = np.exp(clfx.score_samples(xplot))
-            labelx = "1D Probability\nDensity\nDistribution"
+            labelx = "GMM 1D Probability\nDensity\nDistribution"
 
         ax[0].set_xlim(xmin, xmax)
         ax[0].plot(
@@ -924,7 +924,7 @@ class WeightedGaussianMixture(GaussianMixture):
                 labely = "membership"
             else:
                 rvy = np.exp(clfy.score_samples(yplot))
-                labely = "1D Probability\nDensity\nDistribution"
+                labely = "GMM 1D Probability\nDensity\nDistribution"
             ax[2].plot(rvy, yplot, linewidth=3.0, c="k", label=labely)
             ax[2].set_ylabel("Physical property {}".format(y_component))
             ax[2].set_ylim(ymin, ymax)
@@ -964,7 +964,7 @@ class WeightedGaussianMixture(GaussianMixture):
                 labely = "membership"
             else:
                 rv2d = clf2d.score_samples(pos.reshape(-1, 2))
-                labely = "2D Probability Density Distribution"
+                labely = "GMM 2D Probability Density Distribution"
 
             contour_opts = {"levels": 10, "cmap": "viridis", **contour_opts}
             surf = ax[1].contourf(x, y, rv2d.reshape(x.shape), **contour_opts)
@@ -1007,7 +1007,10 @@ class WeightedGaussianMixture(GaussianMixture):
             ax[1].set_ylabel("")
             ax[1].set_xlabel("")
 
-        return ax
+            return ax, cbpetro
+
+        else:
+            return ax
 
 
 class GaussianMixtureWithPrior(WeightedGaussianMixture):
